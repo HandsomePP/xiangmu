@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dao.JiankangDao">
+
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        a.id as id
+        ,a.yonghuid as yonghuid
+        ,a.content as content
+        ,a.createTime as createTime
+        ,a.type as type
+    </sql>
+
+    <select id="selectListView" parameterType="map" resultType="com.entity.view.JiankangView" >
+        SELECT
+        <include refid="Base_Column_List" />,b.name as yonghuName
+        FROM jiankang a LEFT JOIN yonghu b ON a.yonghuid = b.id
+        <where>
+            <if test=" params.id != '' and params.id != null and params.id != 'null' ">
+                and a.id = #{params.id}
+            </if>
+            <if test=" params.yonghuid != '' and params.yonghuid != null and params.yonghuid != 'null' ">
+                and a.yonghuid = #{params.yonghuid}
+            </if>
+            <if test=" params.content != '' and params.content != null and params.content != 'null' ">
+                and a.content like CONCAT('%',#{params.content},'%')
+            </if>
+            <if test=" params.createTimeStart != '' and params.createTimeStart != null ">
+                and a.createTime >= #{params.createTimeStart}
+            </if>
+            <if test=" params.createTimeEnd != '' and params.createTimeEnd != null ">
+                and a.createTime &lt;= #{params.createTimeEnd}
+            </if>
+            <if test=" params.type != '' and params.type != null and params.type != 'null' ">
+                and a.type = #{params.type}
+            </if>
+        </where>
+        order by a.createTime desc
+    </select>
+
+</mapper> 

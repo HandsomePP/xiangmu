@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+	<title>我的健康记录</title>
+	<link rel="stylesheet" href="../../layui/css/layui.css">
+	<link rel="stylesheet" href="../../xznstatic/css/common.css"/>
+	<style>
+		.container {
+			min-height: 85vh;
+			margin: 20px auto;
+			max-width: 1000px;
+			padding: 20px;
+			display: flex;
+		}
+		
+		.sidebar {
+			width: 200px;
+			background-color: #f5f5f5;
+			padding: 20px;
+			border-radius: 5px;
+			margin-right: 20px;
+		}
+		
+		.sidebar ul {
+			list-style: none;
+			padding: 0;
+			margin: 0;
+		}
+		
+		.sidebar li {
+			margin-bottom: 10px;
+		}
+		
+		.sidebar li a {
+			display: block;
+			padding: 10px 15px;
+			background-color: #e0e0e0;
+			color: #333;
+			border-radius: 4px;
+			text-decoration: none;
+			transition: all 0.3s;
+		}
+		
+		.sidebar li.active a {
+			background-color: #005577;
+			color: white;
+		}
+		
+		.sidebar li a:hover {
+			background-color: #005577;
+			color: white;
+		}
+		
+		.content {
+			flex: 1;
+		}
+		
+		.page-title {
+			text-align: center;
+			padding: 20px 0;
+			font-size: 24px;
+			color: #005577;
+		}
+		
+		.record-actions {
+			margin-bottom: 20px;
+		}
+		
+		.record-card {
+			margin-bottom: 15px;
+			position: relative;
+		}
+		
+		.record-card .layui-card-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+		
+		.record-date {
+			color: #999;
+			font-size: 14px;
+		}
+		
+		.record-actions button {
+			margin-right: 10px;
+		}
+		
+		.no-records {
+			text-align: center;
+			padding: 40px 0;
+			color: #999;
+		}
+		
+		.pager {
+			text-align: center;
+			margin-top: 20px;
+		}
+	</style>
+</head>
+<body>
+	<div class="page-title">我的健康记录</div>
+	
+	<div class="container">
+		<div class="sidebar">
+			<ul>
+				<li class="active"><a href="./jiankang-record.html">我的健康记录</a></li>
+				<li><a href="./jiankang-diet.html">我的饮食计划</a></li>
+				<li><a href="./jiankang-report.html">我的健康报告</a></li>
+			</ul>
+		</div>
+		
+		<div class="content">
+			<!-- 操作按钮 -->
+			<div class="record-actions">
+				<button class="layui-btn layui-btn-normal" id="add-record-btn">添加健康记录</button>
+			</div>
+			
+			<!-- 健康记录列表 -->
+			<div class="layui-row" id="records-container">
+				<!-- 记录将通过JS动态添加 -->
+				<div class="no-records" id="no-records">暂无健康记录信息</div>
+			</div>
+			
+			<!-- 分页 -->
+			<div class="pager" id="pager"></div>
+		</div>
+	</div>
+
+	<!-- 添加/编辑记录的表单弹窗 -->
+	<div id="record-form" style="display: none; padding: 20px;">
+		<form class="layui-form">
+			<input type="hidden" name="id" id="record-id">
+			<div class="layui-form-item layui-form-text">
+				<label class="layui-form-label">健康记录内容</label>
+				<div class="layui-input-block">
+					<textarea name="content" id="record-content" placeholder="请输入您的健康记录内容" class="layui-textarea" style="height: 200px;"></textarea>
+				</div>
+			</div>
+		</form>
+	</div>
+
+	<script src="../../layui/layui.js"></script>
+	<script src="../../js/vue.js"></script>
+	<script src="../../js/config.js"></script>
+	<script src="../../js/utils.js"></script>
+	<script src="../../xznstatic/js/jquery-1.11.3.min.js"></script>
+	<script src="../../modules/config.js"></script>
+	
+	<script>
+		layui.use(['layer', 'element', 'http', 'form', 'laypage'], function() {
+			var layer = layui.layer;
+			var element = layui.element;
+			var http = layui.http;
+			var form = layui.form;
+			var laypage = layui.laypage;
+			var jquery = layui.jquery;
+			
+			// 分页参数
+			var limit = 10;
+			var page = 1;
+			var count = 0;
+			
+			var userId = localStorage.getItem('userid') || null;
+			if (!userId) {
+				layer.msg('请先登录', {icon: 2}, function() {
+					location.href = '../login/login.html';
+				});
+				return;
+			}
+			
+			// 加载健康记录
+			loadHealthRecords();
+			
+			// 添加健康记录按钮点击事件
+			$('#add-record-btn').click(function() {
+				openRecordForm();
+			});
+			
+			// 加载健康记录数据
+			function loadHealthRecords() {
+				var param = {
+					page: page,
+					limit: limit,
+					yonghuid: userId,
+					type: 1 // 健康记录类型为1
+				};
+				
+				// 获取列表数据
+				http.request('jiankang/page', 'get', param, function(res) {
+					renderRecords(res.data.list);
+					count = res.data.total;
+					
+					// 分页
+					laypage.render({
+						elem: 'pager',
+						count: count,
+						limit: limit,
+						groups: 3,
+						layout: ["prev", "page", "next"],
+						theme: '#005577',
+						curr: page,
+						jump: function(obj, first) {
+							// 首次不执行
+							if (!first) {
+								page = obj.curr;
+								loadHealthRecords();
+							}
+						}
+					});
+				});
+			}
+			
+			// 渲染健康记录列表
+			function renderRecords(records) {
+				var container = $('#records-container');
+				container.empty(); // 清空容器
+				
+				if (!records || records.length === 0) {
+					container.append('<div class="no-records">暂无健康记录信息</div>');
+					return;
+				}
+				
+				// 添加记录卡片
+				records.forEach(function(record) {
+					var dateStr = record.createTime ? new Date(record.createTime).toLocaleString() : '';
+					var card = $(`
+						<div class="record-card layui-card">
+							<div class="layui-card-header">
+								<span>健康记录</span>
+								<span class="record-date">${dateStr}</span>
+							</div>
+							<div class="layui-card-body">
+								${record.content}
+							</div>
+							<div class="layui-card-footer" style="text-align: right; padding: 10px;">
+								<button class="layui-btn layui-btn-xs layui-btn-normal edit-btn" data-id="${record.id}">编辑</button>
+								<button class="layui-btn layui-btn-xs layui-btn-danger delete-btn" data-id="${record.id}">删除</button>
+							</div>
+						</div>
+					`);
+					
+					container.append(card);
+				});
+				
+				// 绑定编辑按钮事件
+				$('.edit-btn').click(function() {
+					var recordId = $(this).data('id');
+					editRecord(recordId);
+				});
+				
+				// 绑定删除按钮事件
+				$('.delete-btn').click(function() {
+					var recordId = $(this).data('id');
+					deleteRecord(recordId);
+				});
+			}
+			
+			// 打开添加/编辑记录表单
+			function openRecordForm(record) {
+				// 清空表单
+				$('#record-id').val('');
+				$('#record-content').val('');
+				
+				// 如果是编辑，填充数据
+				if (record) {
+					$('#record-id').val(record.id);
+					$('#record-content').val(record.content);
+				}
+				
+				// 打开弹窗
+				var title = record ? '编辑健康记录' : '添加健康记录';
+				layer.open({
+					type: 1,
+					title: title,
+					area: ['500px', '400px'],
+					content: $('#record-form'),
+					btn: ['确认', '取消'],
+					yes: function(index) {
+						saveRecord(index);
+					},
+					btn2: function(index) {
+						layer.close(index);
+					}
+				});
+			}
+			
+			// 保存健康记录
+			function saveRecord(index) {
+				var id = $('#record-id').val();
+				var content = $('#record-content').val();
+				
+				if (!content) {
+					layer.msg('请输入健康记录内容', {icon: 2});
+					return;
+				}
+				
+				var recordData = {
+					content: content,
+					yonghuid: userId,
+					type: 1 // 健康记录类型为1
+				};
+				
+				if (id) {
+					// 编辑记录
+					recordData.id = id;
+					
+					// 使用jQuery的ajax而不是http模块，确保设置Content-Type
+					$.ajax({
+						url: http.baseurl + "jiankang/update",
+						type: 'POST',
+						contentType: 'application/json',
+						data: JSON.stringify(recordData),
+						beforeSend: function(xhr) {
+							xhr.setRequestHeader('Token', localStorage.getItem('Token'));
+						},
+						success: function(res) {
+							if (res.code == 0) {
+								layer.msg('更新成功', {icon: 1});
+								layer.close(index);
+								// 重新加载当前页数据
+								loadHealthRecords();
+							} else {
+								layer.msg('更新失败: ' + res.msg, {icon: 2});
+							}
+						},
+						error: function(xhr) {
+							layer.msg('请求失败: ' + xhr.status, {icon: 2});
+						}
+					});
+				} else {
+					// 添加新记录
+					$.ajax({
+						url: http.baseurl + "jiankang/save",
+						type: 'POST',
+						contentType: 'application/json',
+						data: JSON.stringify(recordData),
+						beforeSend: function(xhr) {
+							xhr.setRequestHeader('Token', localStorage.getItem('Token'));
+						},
+						success: function(res) {
+							if (res.code == 0) {
+								layer.msg('添加成功', {icon: 1});
+								layer.close(index);
+								// 重新加载第一页数据
+								page = 1;
+								loadHealthRecords();
+							} else {
+								layer.msg('添加失败: ' + res.msg, {icon: 2});
+							}
+						},
+						error: function(xhr) {
+							layer.msg('请求失败: ' + xhr.status, {icon: 2});
+						}
+					});
+				}
+			}
+			
+			// 编辑健康记录
+			function editRecord(recordId) {
+				http.request('jiankang/info/' + recordId, 'get', {}, function(res) {
+					if (res.code == 0) {
+						openRecordForm(res.data);
+					} else {
+						layer.msg('获取记录信息失败', {icon: 2});
+					}
+				});
+			}
+			
+			// 删除健康记录
+			function deleteRecord(recordId) {
+				layer.confirm('确定要删除这条健康记录吗？', function(index) {
+					$.ajax({
+						url: http.baseurl + "jiankang/delete",
+						type: 'POST',
+						contentType: 'application/json',
+						data: JSON.stringify([recordId]),
+						beforeSend: function(xhr) {
+							xhr.setRequestHeader('Token', localStorage.getItem('Token'));
+						},
+						success: function(res) {
+							if (res.code == 0) {
+								layer.msg('删除成功', {icon: 1});
+								// 如果删除后当前页没有数据了且不是第一页，则返回上一页
+								if ($('.record-card').length <= 1 && page > 1) {
+									page--;
+								}
+								loadHealthRecords();
+							} else {
+								layer.msg('删除失败: ' + res.msg, {icon: 2});
+							}
+							layer.close(index);
+						},
+						error: function(xhr) {
+							layer.msg('请求失败: ' + xhr.status, {icon: 2});
+							layer.close(index);
+						}
+					});
+				});
+			}
+		});
+	</script>
+</body>
+</html> 
