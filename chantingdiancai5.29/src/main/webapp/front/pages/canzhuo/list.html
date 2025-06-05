@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="utf-8">
+    <title>餐桌预定</title>
+    <meta name="keywords" content=""/>
+    <meta name="description" content=""/>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel="stylesheet" href="../../layui/css/layui.css">
+    <link rel="stylesheet" href="../../xznstatic/css/common.css"/>
+    <link rel="stylesheet" href="../../xznstatic/css/style.css"/>
+    <script type="text/javascript" src="../../xznstatic/js/jquery-1.11.3.min.js"></script>
+    <script type="text/javascript" src="../../xznstatic/js/jquery.SuperSlide.2.1.1.js"></script>
+</head>
+<style>
+    html::after {
+        position: fixed;
+        top: 0;
+        right: 0;
+        left: 0;
+        bottom: 0;
+        content: '';
+        display: block;
+        background-attachment: fixed;
+        background-size: cover;
+        background-position: center;
+    }
+
+    .table-card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        padding: 20px;
+        transition: all 0.3s ease;
+    }
+
+    .table-card:hover {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+
+    .table-name {
+        font-size: 24px;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 10px;
+    }
+
+    .table-location {
+        color: #666;
+        font-size: 16px;
+        margin-bottom: 15px;
+    }
+
+    .table-status {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 14px;
+        margin-bottom: 15px;
+    }
+
+    .status-available {
+        background: #e8f5e8;
+        color: #52c41a;
+    }
+
+    .status-occupied {
+        background: #fff2e8;
+        color: #fa8c16;
+    }
+
+    .reserve-btn {
+        background: #1890ff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background 0.3s;
+    }
+
+    .reserve-btn:hover {
+        background: #096dd9;
+    }
+
+    .reserve-btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+
+    .search-box {
+        background: #fff;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+</style>
+<body>
+    <div id="app">
+        <!-- 搜索栏 -->
+        <div class="search-box">
+            <div class="layui-row">
+                <div class="layui-col-md8">
+                    <div class="layui-input-group">
+                        <div class="layui-input-split layui-input-prefix">
+                            <i class="layui-icon layui-icon-search"></i>
+                        </div>
+                        <input type="text" v-model="searchName" placeholder="输入餐桌名称搜索" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-col-md4" style="text-align: right;">
+                    <button @click="search" class="layui-btn">
+                        <i class="layui-icon layui-icon-search"></i> 搜索
+                    </button>
+                    <button @click="reset" class="layui-btn layui-btn-primary">
+                        <i class="layui-icon layui-icon-refresh"></i> 重置
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 餐桌列表 -->
+        <div class="layui-container">
+            <div class="layui-row layui-col-space20">
+                <div class="layui-col-md6" v-for="(item, index) in dataList" :key="index">
+                    <div class="table-card">
+                        <div class="table-name">{{item.name}}</div>
+                        <div class="table-location">
+                            <i class="layui-icon layui-icon-location"></i> {{item.tableLocation}}
+                        </div>
+                        <div v-if="item.sfTypes == 2" class="table-status status-available">
+                            <i class="layui-icon layui-icon-ok-circle"></i> 可预定
+                        </div>
+                        <div v-else class="table-status status-occupied">
+                            <i class="layui-icon layui-icon-close-fill"></i> 已预定
+                        </div>
+                        <div>
+                            <button 
+                                v-if="item.sfTypes == 2" 
+                                @click="reserveTable(item.id, index)"
+                                class="reserve-btn">
+                                <i class="layui-icon layui-icon-add-circle"></i> 立即预定
+                            </button>
+                            <button v-else class="reserve-btn" disabled>
+                                <i class="layui-icon layui-icon-close"></i> 不可预定
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分页 -->
+            <div id="page" style="text-align: center; margin-top: 30px;"></div>
+        </div>
+    </div>
+
+    <!-- layui -->
+    <script src="../../layui/layui.js"></script>
+    <!-- vue -->
+    <script src="../../js/vue.js"></script>
+    <!-- 组件配置信息 -->
+    <script src="../../js/config.js"></script>
+    <!-- 扩展插件配置信息 -->
+    <script src="../../modules/config.js"></script>
+    <!-- 工具方法 -->
+    <script src="../../js/utils.js"></script>
+
+    <script>
+        var vue = new Vue({
+            el: '#app',
+            data: {
+                // 搜索关键字
+                searchName: '',
+                // 数据列表
+                dataList: [],
+                // 分页信息
+                page: 1,
+                limit: 10,
+                total: 0,
+                // 状态字典
+                statusDict: {}
+            },
+            mounted() {
+                // 获取状态字典
+                this.loadStatusDictionary();
+                this.getDataList();
+            },
+            methods: {
+                // 加载状态字典
+                loadStatusDictionary() {
+                    layui.use(['http'], function() {
+                        var http = layui.http;
+                        http.request('dictionary/page', 'get', {
+                            page: 1,
+                            limit: 100,
+                            dicCode: 'sf_types'
+                        }, function(res) {
+                            if (res.code == 0) {
+                                // 将字典数据转换为map
+                                res.data.list.forEach(item => {
+                                    vue.statusDict[item.codeIndex] = item.indexName;
+                                });
+                            }
+                        });
+                    });
+                },
+
+                // 获取状态文本
+                getStatusText(sfTypes) {
+                    return this.statusDict[sfTypes] || (sfTypes == 2 ? '否' : '是');
+                },
+
+                // 获取数据列表
+                getDataList() {
+                    layui.use(['http'], function() {
+                        var http = layui.http;
+                        var param = {
+                            page: vue.page,
+                            limit: vue.limit,
+                            sfTypes: 2  // 只显示未预定的餐桌
+                        };
+                        
+                        if (vue.searchName) {
+                            param.name = vue.searchName;
+                        }
+
+                        http.request('canzhuo/page', 'get', param, function(res) {
+                            if (res.code == 0) {
+                                vue.dataList = res.data.list;
+                                vue.total = res.data.total;
+                                vue.renderPage();
+                            }
+                        });
+                    });
+                },
+
+                // 搜索
+                search() {
+                    this.page = 1;
+                    this.getDataList();
+                },
+
+                // 重置
+                reset() {
+                    this.searchName = '';
+                    this.page = 1;
+                    this.getDataList();
+                },
+
+                // 预定餐桌
+                reserveTable(tableId, index) {
+                    // 检查用户是否登录
+                    if (!localStorage.getItem('userid')) {
+                        layui.use(['layer'], function() {
+                            var layer = layui.layer;
+                            layer.msg('请先登录', {icon: 2}, function() {
+                                location.href = '../login/login.html';
+                            });
+                        });
+                        return;
+                    }
+
+                    layui.use(['http', 'layer'], function() {
+                        var http = layui.http;
+                        var layer = layui.layer;
+
+                        // 检查用户是否已经有预定
+                        http.request('yudingcanzhuo/page', 'get', {
+                            page: 1,
+                            limit: 1
+                        }, function(res) {
+                            if (res.code == 0 && res.data.list.length > 0) {
+                                layer.msg('您已经预定了餐桌，请先取消当前预定再预定新餐桌', {icon: 2});
+                                return;
+                            }
+                            
+                            // 没有预定，可以进行预定
+                            layer.confirm('确定要预定这个餐桌吗？', {
+                                btn: ['确定', '取消']
+                            }, function(confirmIndex) {
+                                http.request('canzhuo/subscribe', 'get', {
+                                    ids: tableId
+                                }, function(res) {
+                                    if (res.code == 0) {
+                                        layer.msg('预定成功！', {icon: 1});
+                                        // 更新当前项状态或从列表中移除
+                                        vue.dataList.splice(index, 1);
+                                        vue.total--;
+                                        layer.close(confirmIndex);
+                                    }
+                                });
+                            });
+                        });
+                    });
+                },
+
+                // 渲染分页
+                renderPage() {
+                    layui.use('laypage', () => {
+                        var laypage = layui.laypage;
+                        laypage.render({
+                            elem: 'page',
+                            count: this.total,
+                            limit: this.limit,
+                            curr: this.page,
+                            layout: ['count', 'prev', 'page', 'next', 'skip'],
+                            jump: (obj, first) => {
+                                if (!first) {
+                                    this.page = obj.curr;
+                                    this.getDataList();
+                                }
+                            }
+                        });
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>客服对话</title>
+		<link rel="stylesheet" type="text/css" href="../../elementui/elementui.css" />
+		<style>
+			html,body,#app {
+				margin: 0;
+				padding: 0;
+			}
+			body {
+				background-color: #f5f5f5;
+				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+			}
+			.chat-container {
+				min-height: 600px;
+				display: flex;
+				flex-direction: column;
+				max-width: 1200px;
+				margin: 0 auto;
+				background-color: white;
+				box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+			}
+			.chat-header {
+				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+				color: white;
+				padding: 20px;
+				text-align: center;
+				font-size: 20px;
+				font-weight: bold;
+				box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+			}
+			.chat-content {
+				overflow-y: auto;
+				padding: 20px;
+				background-color: #f8f9fa;
+				min-height: 400px;
+				max-height: 500px;
+			}
+			.message-item {
+				margin-bottom: 20px;
+				display: flex;
+				align-items: flex-start;
+			}
+			.message-user {
+				justify-content: flex-end;
+			}
+			.message-admin {
+				justify-content: flex-start;
+			}
+			.message-avatar {
+				width: 40px;
+				height: 40px;
+				border-radius: 50%;
+				margin: 0 10px;
+				background-size: cover;
+				background-position: center;
+				flex-shrink: 0;
+			}
+			.avatar-user {
+				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+				background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>');
+			}
+			.avatar-admin {
+				background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+				background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>');
+			}
+			.message-bubble {
+				max-width: 60%;
+				padding: 12px 16px;
+				border-radius: 18px;
+				font-size: 14px;
+				line-height: 1.4;
+				word-wrap: break-word;
+				position: relative;
+			}
+			.bubble-user {
+				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+				color: white;
+				border-bottom-right-radius: 4px;
+			}
+			.bubble-admin {
+				background: white;
+				color: #333;
+				border: 1px solid #e1e8ed;
+				border-bottom-left-radius: 4px;
+			}
+			.message-time {
+				font-size: 11px;
+				color: #8899a6;
+				margin-top: 5px;
+				text-align: center;
+			}
+			.message-user .message-time {
+				color: rgba(255,255,255,0.7);
+			}
+			.chat-input-area {
+				background: white;
+				border-top: 1px solid #e1e8ed;
+				padding: 20px;
+				box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+			}
+			.input-container {
+				display: flex;
+				gap: 15px;
+				align-items: flex-end;
+				max-width: 800px;
+				margin: 0 auto;
+			}
+			.message-input {
+				flex: 1;
+			}
+			.send-button {
+				height: 40px;
+				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+				border: none;
+				border-radius: 20px;
+				padding: 0 20px;
+				color: white;
+				font-weight: bold;
+				cursor: pointer;
+				transition: all 0.3s ease;
+			}
+			.send-button:hover {
+				transform: translateY(-1px);
+				box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+			}
+			.send-button:disabled {
+				background: #ccc;
+				cursor: not-allowed;
+				transform: none;
+				box-shadow: none;
+			}
+			.typing-indicator {
+				display: flex;
+				align-items: center;
+				padding: 10px 20px;
+				color: #8899a6;
+				font-size: 12px;
+			}
+			.typing-dots {
+				display: inline-flex;
+				gap: 3px;
+				margin-left: 5px;
+			}
+			.typing-dot {
+				width: 4px;
+				height: 4px;
+				border-radius: 50%;
+				background: #8899a6;
+				animation: typing 1.4s infinite ease-in-out;
+			}
+			.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+			.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+			@keyframes typing {
+				0%, 60%, 100% { transform: translateY(0); }
+				30% { transform: translateY(-10px); }
+			}
+			.empty-state {
+				text-align: center;
+				padding: 60px 20px;
+				color: #8899a6;
+			}
+			.empty-icon {
+				font-size: 48px;
+				margin-bottom: 15px;
+				color: #d1d9e0;
+			}
+			.empty-text {
+				font-size: 14px;
+				margin-bottom: 10px;
+			}
+			.empty-hint {
+				font-size: 12px;
+				color: #c1c9d0;
+			}
+			
+			/* 调试信息样式 */
+			.debug-info {
+				background: #f0f2f5;
+				padding: 10px;
+				margin: 10px 0;
+				border-radius: 4px;
+				font-size: 12px;
+				color: #666;
+			}
+			
+			/* 响应式设计 */
+			@media (max-width: 768px) {
+				.chat-container {
+					margin: 0;
+				}
+				.chat-header {
+					padding: 15px;
+					font-size: 18px;
+				}
+				.chat-content {
+					padding: 15px;
+				}
+				.message-bubble {
+					max-width: 75%;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div id="app">
+			<div class="chat-container">
+				<div class="chat-header">
+					<i class="el-icon-service"></i> 客服对话
+				</div>
+				
+				<div class="chat-content" ref="chatContent">
+					<!-- 调试信息 -->
+					<div v-if="debugInfo" class="debug-info">
+						调试信息: {{ debugInfo }}
+					</div>
+					
+					<!-- 未登录提示 -->
+					<div v-if="!userId" class="empty-state">
+						<div class="empty-icon">🔐</div>
+						<div class="empty-text">请先登录后使用客服功能</div>
+						<div class="empty-hint">
+							<button @click="goLogin" style="margin-top: 15px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 20px; cursor: pointer;">
+								前往登录
+							</button>
+						</div>
+					</div>
+					
+					<div v-else-if="messageList.length === 0" class="empty-state">
+						<div class="empty-icon">💬</div>
+						<div class="empty-text">还没有消息，开始对话吧！</div>
+						<div class="empty-hint">按 Enter 发送，Shift + Enter 换行</div>
+					</div>
+					
+					<div v-for="message in messageList" :key="message.id" 
+						 :class="['message-item', message.type === 'user' ? 'message-user' : 'message-admin']">
+						<div v-if="message.type === 'admin'" class="message-avatar avatar-admin"></div>
+						<div class="message-bubble" :class="message.type === 'user' ? 'bubble-user' : 'bubble-admin'">
+							<div>{{ message.content }}</div>
+							<div class="message-time">{{ formatTime(message.time) }}</div>
+						</div>
+						<div v-if="message.type === 'user'" class="message-avatar avatar-user"></div>
+					</div>
+					
+					<div v-if="isAdminTyping" class="typing-indicator">
+						<div class="message-avatar avatar-admin"></div>
+						<div>
+							客服正在输入
+							<span class="typing-dots">
+								<span class="typing-dot"></span>
+								<span class="typing-dot"></span>
+								<span class="typing-dot"></span>
+							</span>
+						</div>
+					</div>
+				</div>
+				
+				<div class="chat-input-area">
+					<div class="input-container">
+						<el-input 
+							v-model="inputMessage" 
+							type="textarea" 
+							:rows="1"
+							:autosize="{ minRows: 1, maxRows: 4 }"
+							placeholder="输入消息..."
+							class="message-input"
+							@keydown.enter.exact="handleEnter"
+							@keydown.enter.shift.exact="handleShiftEnter"
+							:disabled="sending || !userId">
+						</el-input>
+						<button 
+							@click="sendMessage" 
+							:disabled="!inputMessage.trim() || sending || !userId"
+							class="send-button">
+							<i v-if="sending" class="el-icon-loading"></i>
+							<span v-else>发送</span>
+						</button>
+					</div>
+					<div style="font-size: 12px; color: #8899a6; margin-top: 10px; text-align: center;">
+						<span v-if="userId">按 Enter 发送，Shift + Enter 换行 | 客服在线时间：9:00-21:00</span>
+						<span v-else>请先登录后使用客服功能</span>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- layui -->
+		<script src="../../layui/layui.js"></script>
+		<!-- vue -->
+		<script src="../../js/vue.js"></script>
+		<!-- elementui -->
+		<script src="../../elementui/elementui.js"></script>
+		<!-- 组件配置信息 -->
+		<script src="../../js/config.js"></script>
+		<!-- 扩展插件配置信息 -->
+		<script src="../../modules/config.js"></script>
+		<!-- 工具方法 -->
+		<script src="../../js/utils.js"></script>
+		<script type="text/javascript">
+			var app = new Vue({
+				el: "#app",
+				data() {
+					return {
+						inputMessage: '',
+						messageList: [],
+						sending: false,
+						isAdminTyping: false,
+						lastMessageCount: 0,
+						pollingInterval: null,
+						typingTimeout: null,
+						userId: null,
+						debugInfo: ''
+					}
+				},
+				mounted() {
+					this.init();
+				},
+				beforeDestroy() {
+					if (this.pollingInterval) {
+						clearInterval(this.pollingInterval);
+					}
+					if (this.typingTimeout) {
+						clearTimeout(this.typingTimeout);
+					}
+				},
+				methods: {
+					init() {
+						// 获取用户ID
+						this.userId = localStorage.getItem('userid');
+						let userTable = localStorage.getItem('userTable');
+						let token = localStorage.getItem('Token');
+						
+						this.debugInfo = `用户ID: ${this.userId} | 用户表: ${userTable} | Token: ${token ? '已设置' : '未设置'}`;
+						
+						if (!this.userId) {
+							this.debugInfo += ' | 未找到用户ID，请先登录';
+							return;
+						}
+						
+						this.loadMessages();
+						// 每3秒轮询一次新消息
+						this.pollingInterval = setInterval(() => {
+							this.loadMessages();
+						}, 3000);
+					},
+					
+					loadMessages() {
+						if (!this.userId) {
+							this.debugInfo = '用户未登录';
+							return;
+						}
+						
+						layui.http.request('chat/list', 'get', {
+							userid: this.userId,
+							sort: 'addtime',
+							order: 'asc',
+							page: 1,
+							limit: 1000  // 设置一个大的limit值来获取所有消息
+						}, (res) => {
+							console.log('加载消息响应:', res);
+							this.debugInfo = `用户ID: ${this.userId} | 请求成功`;
+							
+							if (res.data && res.data.list) {
+								const newMessages = this.processMessages(res.data.list);
+								this.debugInfo += ` | 消息数量: ${newMessages.length}`;
+								
+								// 检查是否有新消息
+								if (newMessages.length > this.lastMessageCount) {
+									// 如果有新的管理员回复，显示一下输入指示器效果
+									const hasNewAdminMessage = newMessages.slice(this.lastMessageCount)
+										.some(msg => msg.type === 'admin');
+									
+									if (hasNewAdminMessage && this.lastMessageCount > 0) {
+										this.showAdminTypingEffect();
+									}
+									
+									this.messageList = newMessages;
+									this.lastMessageCount = newMessages.length;
+									this.scrollToBottom();
+								} else {
+									this.messageList = newMessages;
+									this.lastMessageCount = newMessages.length;
+								}
+							} else {
+								this.debugInfo += ' | 无数据返回';
+							}
+						}, (error) => {
+							console.error('加载消息失败:', error);
+							this.debugInfo = `用户ID: ${this.userId} | 请求失败: ${error}`;
+						});
+					},
+					
+					processMessages(rawData) {
+						const messages = [];
+						
+						rawData.forEach(item => {
+							// 用户提问 - 显示在右侧
+							if (item.ask && item.ask.trim()) {
+								messages.push({
+									id: `ask_${item.id}`,
+									type: 'user',
+									content: item.ask,
+									time: item.addtime
+								});
+							}
+							
+							// 管理员回复 - 显示在左侧
+							if (item.reply && item.reply.trim()) {
+								messages.push({
+									id: `reply_${item.id}`,
+									type: 'admin', 
+									content: item.reply,
+									time: item.addtime
+								});
+							}
+						});
+						
+						// 按时间排序
+						return messages.sort((a, b) => new Date(a.time) - new Date(b.time));
+					},
+					
+					sendMessage() {
+						if (!this.inputMessage.trim() || this.sending) return;
+						
+						this.sending = true;
+						
+						layui.http.requestJson('chat/add', 'post', {
+							userid: this.userId,
+							ask: this.inputMessage.trim()
+						}, (res) => {
+							this.inputMessage = '';
+							this.sending = false;
+							this.loadMessages();
+							this.scrollToBottom();
+						}, (error) => {
+							this.sending = false;
+							this.$message.error('发送失败，请重试');
+						});
+					},
+					
+					handleEnter(event) {
+						event.preventDefault();
+						this.sendMessage();
+					},
+					
+					handleShiftEnter(event) {
+						// 允许Shift+Enter换行，不阻止默认行为
+					},
+					
+					formatTime(timeStr) {
+						const date = new Date(timeStr);
+						const now = new Date();
+						const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+						const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+						
+						const timeFormat = date.toLocaleTimeString('zh-CN', {
+							hour: '2-digit',
+							minute: '2-digit'
+						});
+						
+						if (messageDate.getTime() === today.getTime()) {
+							return timeFormat;
+						} else {
+							return `${date.getMonth() + 1}/${date.getDate()} ${timeFormat}`;
+						}
+					},
+					
+					scrollToBottom() {
+						this.$nextTick(() => {
+							const container = this.$refs.chatContent;
+							if (container) {
+								container.scrollTop = container.scrollHeight;
+							}
+						});
+					},
+					
+					showAdminTypingEffect() {
+						this.isAdminTyping = true;
+						this.scrollToBottom();
+						
+						if (this.typingTimeout) {
+							clearTimeout(this.typingTimeout);
+						}
+						
+						this.typingTimeout = setTimeout(() => {
+							this.isAdminTyping = false;
+						}, 2000);
+					},
+					
+					goLogin() {
+						window.parent.location.href = '../login/login.html';
+					}
+				}
+			});
+
+			layui.use(['layer', 'element', 'http', 'jquery'], function() {
+				var layer = layui.layer;
+				var element = layui.element;
+				var http = layui.http;
+				var jquery = layui.jquery;
+			});
+		</script>
+	</body>
+</html>

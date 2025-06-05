@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+	<title>我的健康报告</title>
+	<link rel="stylesheet" href="../../layui/css/layui.css">
+	<link rel="stylesheet" href="../../xznstatic/css/common.css"/>
+	<style>
+		body{
+			height: 850px;
+		}
+		.container {
+			height: 100%;
+			margin: 20px auto;
+			max-width: 1000px;
+			padding: 20px;
+			display: flex;
+		}
+		
+		.sidebar {
+			width: 200px;
+			background-color: #f5f5f5;
+			padding: 20px;
+			border-radius: 5px;
+			margin-right: 20px;
+		}
+		
+		.sidebar ul {
+			list-style: none;
+			padding: 0;
+			margin: 0;
+		}
+		
+		.sidebar li {
+			margin-bottom: 10px;
+		}
+		
+		.sidebar li a {
+			display: block;
+			padding: 10px 15px;
+			background-color: #e0e0e0;
+			color: #333;
+			border-radius: 4px;
+			text-decoration: none;
+			transition: all 0.3s;
+		}
+		
+		.sidebar li.active a {
+			background-color: #005577;
+			color: white;
+		}
+		
+		.sidebar li a:hover {
+			background-color: #005577;
+			color: white;
+		}
+		
+		.content {
+			flex: 1;
+		}
+		
+		.page-title {
+			text-align: center;
+			padding: 20px 0;
+			font-size: 24px;
+			color: #005577;
+		}
+		
+		.report-card {
+			margin-bottom: 15px;
+			position: relative;
+		}
+		
+		.report-card .layui-card-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+		
+		.report-date {
+			color: #999;
+			font-size: 14px;
+		}
+		
+		.no-report {
+			text-align: center;
+			padding: 40px 0;
+			color: #999;
+		}
+		
+		.report-content {
+			white-space: pre-wrap;
+		}
+		
+		/* 健康指标样式 */
+		.health-metrics {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 15px;
+			margin-top: 20px;
+		}
+		
+		.metric-item {
+			border: 1px solid #e0e0e0;
+			border-radius: 8px;
+			padding: 15px;
+			width: calc(50% - 8px);
+			box-sizing: border-box;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+		}
+		
+		.metric-name {
+			font-weight: bold;
+			color: #333;
+			margin-bottom: 10px;
+		}
+		
+		.metric-value {
+			font-size: 24px;
+			color: #005577;
+			margin-bottom: 5px;
+		}
+		
+		.metric-status {
+			font-size: 12px;
+			padding: 2px 8px;
+			border-radius: 10px;
+		}
+		
+		.status-normal {
+			background-color: #c2f5c8;
+			color: #0a5d0f;
+		}
+		
+		.status-warning {
+			background-color: #fff0c2;
+			color: #a46b03;
+		}
+		
+		.status-danger {
+			background-color: #ffcccb;
+			color: #a90000;
+		}
+		
+		/* 输入动画样式 */
+		.typing-indicator {
+			text-align: center;
+			padding: 15px 0;
+		}
+		
+		.typing-dot {
+			display: inline-block;
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			margin: 0 4px;
+			background-color: #aaa;
+			animation: typing-bounce 1.4s infinite ease-in-out both;
+		}
+		
+		@keyframes typing-bounce {
+			0%, 80%, 100% { transform: scale(0.6); }
+			40% { transform: scale(1); }
+		}
+	</style>
+</head>
+<body>
+	<div class="page-title">我的健康报告</div>
+	
+	<div class="container">
+		<div class="sidebar">
+			<ul>
+				<li><a href="./jiankang-record.html">我的健康记录</a></li>
+				<li><a href="./jiankang-diet.html">我的饮食计划</a></li>
+				<li class="active"><a href="./jiankang-report.html">我的健康报告</a></li>
+			</ul>
+		</div>
+		
+		<div class="content">
+			<!-- 生成报告按钮 -->
+			<div class="layui-row" style="margin-bottom: 20px;">
+				<button type="button" class="layui-btn layui-btn-normal" id="generateReportBtn">
+					<i class="layui-icon layui-icon-refresh"></i> 生成健康报告
+				</button>
+			</div>
+			
+			<!-- 健康报告列表 -->
+			<div class="layui-row" id="report-container">
+				<!-- 报告将通过JS动态添加 -->
+				<div class="no-report" id="no-report">暂无健康报告信息</div>
+			</div>
+		</div>
+	</div>
+
+	<script src="../../layui/layui.js"></script>
+	<script src="../../js/vue.js"></script>
+	<script src="../../js/config.js"></script>
+	<script src="../../js/utils.js"></script>
+	<script src="../../xznstatic/js/jquery-1.11.3.min.js"></script>
+	<script src="../../modules/config.js"></script>
+	
+	<script>
+		layui.use(['layer', 'element', 'http', 'jquery'], function() {
+			var layer = layui.layer;
+			var element = layui.element;
+			var http = layui.http;
+			var jquery = layui.jquery;
+			
+			var userId = localStorage.getItem('userid') || null;
+			if (!userId) {
+				layer.msg('请先登录', {icon: 2}, function() {
+					location.href = '../login/login.html';
+				});
+				return;
+			}
+			
+			// 加载健康报告
+			loadHealthReports();
+			
+			// 绑定生成报告按钮点击事件
+			$('#generateReportBtn').click(function() {
+				generateHealthReport();
+			});
+			
+			// 生成健康报告
+			function generateHealthReport() {
+				var loadingIndex = layer.load(1, {
+					shade: [0.1, '#fff']
+				});
+				
+				// 加载用户的健康记录
+				http.request('jiankang/page', 'get', {
+					page: 1,
+					limit: 10,
+					yonghuid: userId,
+					type: 1 // 健康记录类型为1
+				}, function(healthRes) {
+					// 加载用户近期订单
+					http.request('orders/page', 'get', {
+						page: 1,
+						limit: 30, // 获取最近30个订单
+						userid: userId
+					}, function(ordersRes) {
+						layer.close(loadingIndex);
+						
+						// 处理数据
+						var healthRecords = healthRes.code == 0 ? healthRes.data.list : [];
+						var recentOrders = ordersRes.code == 0 ? ordersRes.data.list : [];
+						
+						// 打开AI生成弹窗
+						openAIGenerationDialog(healthRecords, recentOrders);
+					});
+				});
+			}
+			
+			// 打开AI生成弹窗
+			function openAIGenerationDialog(healthRecords, recentOrders) {
+				// 创建弹窗内容
+				var dialogContent = `
+					<div style="padding: 20px;">
+						<div id="ai-response" style="min-height: 100px; max-height: 400px; overflow-y: auto; margin-bottom: 15px; white-space: pre-wrap; background: #f8f8f8; padding: 15px; border-radius: 5px;">
+							<div class="typing-indicator">
+								<span class="typing-dot"></span>
+								<span class="typing-dot" style="animation-delay: 0.2s"></span>
+								<span class="typing-dot" style="animation-delay: 0.4s"></span>
+							</div>
+						</div>
+					</div>
+				`;
+				
+				// 打开弹窗
+				var dialogIndex = layer.open({
+					type: 1,
+					title: '正在生成健康报告...',
+					area: ['600px', '500px'],
+					shadeClose: false,
+					content: dialogContent,
+					success: function() {
+						// 准备数据
+						var healthInfo = '';
+						var healthIssues = [];
+						var age = '';
+						var height = '';
+						var weight = '';
+						
+						// 从健康记录中提取信息
+						healthRecords.forEach(function(record) {
+							var content = record.content || '';
+							healthInfo += content + '\n';
+							
+							// 提取年龄、身高、体重等基本信息
+							var ageMatch = content.match(/年龄[：:]\s*(\d+)/);
+							if (ageMatch && !age) {
+								age = ageMatch[1];
+							}
+							
+							var heightMatch = content.match(/身高[：:]\s*(\d+(\.\d+)?)/);
+							if (heightMatch && !height) {
+								height = heightMatch[1];
+							}
+							
+							var weightMatch = content.match(/体重[：:]\s*(\d+(\.\d+)?)/);
+							if (weightMatch && !weight) {
+								weight = weightMatch[1];
+							}
+							
+							// 提取健康问题
+							['高血压', '糖尿病', '高血脂', '心脏病', '肥胖', '消化不良', '胃炎', '过敏'].forEach(function(issue) {
+								if (content.includes(issue) && !healthIssues.includes(issue)) {
+									healthIssues.push(issue);
+								}
+							});
+						});
+						
+						// 处理订单信息
+						var orderInfo = '';
+						var foodTypes = {
+							vegetable: 0,
+							meat: 0,
+							seafood: 0,
+							dairy: 0,
+							grain: 0,
+							fruit: 0,
+							spicy: 0,
+							fried: 0,
+							sweet: 0
+						};
+						
+						recentOrders.forEach(function(order) {
+							var goodname = order.goodname || '';
+							orderInfo += goodname + ', ';
+							
+							// 统计食物类型
+							if (goodname.match(/蔬菜|青菜|菠菜|西兰花|豆腐|木耳|萝卜|白菜|西红柿/)) {
+								foodTypes.vegetable++;
+							}
+							if (goodname.match(/肉|牛肉|猪肉|鸡肉|羊肉|肉丸|肉片/)) {
+								foodTypes.meat++;
+							}
+							if (goodname.match(/辣|麻辣|香辣|辣椒|川菜|湘菜/)) {
+								foodTypes.spicy++;
+							}
+							if (goodname.match(/炸|油炸|炸鸡|薯条|炸薯条|炸串/)) {
+								foodTypes.fried++;
+							}
+						});
+						
+						// 构建AI提示
+						var systemPrompt = "你是一位健康分析师，专门根据用户的健康记录和饮食习惯生成健康报告。报告应包含对用户健康状况的总结分析、健康指标评估和饮食建议。";
+						
+						var userPrompt = `请根据以下信息生成一份JSON格式的健康报告：
+						
+用户健康记录：
+${healthInfo}
+
+用户近期饮食订单：
+${orderInfo}
+
+饮食统计：
+- 蔬菜类食物：${foodTypes.vegetable}次
+- 肉类食物：${foodTypes.meat}次
+- 辛辣食物：${foodTypes.spicy}次
+- 油炸食物：${foodTypes.fried}次
+
+${age ? '年龄：' + age : ''}
+${height ? '身高：' + height + 'cm' : ''}
+${weight ? '体重：' + weight + 'kg' : ''}
+${healthIssues.length > 0 ? '健康问题：' + healthIssues.join('，') : ''}
+
+请生成一份JSON格式的健康报告，包含以下字段：
+1. summary: 健康状况摘要
+2. metrics: 健康指标数组，每个指标包含name(名称), value(数值), status(状态:normal,warning,danger), statusText(状态文本)
+3. suggestions: 健康建议数组
+
+示例格式：
+{
+  "summary": "根据您的健康记录和近期饮食分析...",
+  "metrics": [
+    {"name": "身体质量指数 (BMI)", "value": "23.5", "status": "normal", "statusText": "正常"},
+    {"name": "蔬菜摄入比例", "value": "30%", "status": "warning", "statusText": "不足"}
+  ],
+  "suggestions": [
+    "建议增加蔬菜摄入量，蔬菜应占每日饮食的35%以上。",
+    "您的健康记录显示有高血压问题，建议控制盐分摄入。"
+  ]
+}`;
+
+						// 调用AI生成报告
+						callDeepseekAPI(systemPrompt, userPrompt, function(reportContent) {
+							// 尝试解析JSON响应
+							try {
+								var reportData = JSON.parse(reportContent);
+								
+								// 保存报告数据
+								saveHealthReport(reportData, function() {
+									layer.close(dialogIndex);
+									// 立即重新加载报告列表
+									loadHealthReports();
+									layer.msg('健康报告生成成功', {icon: 1});
+								}, function(error) {
+									layer.close(dialogIndex);
+									// 即使保存失败，也刷新显示之前的报告
+									loadHealthReports();
+									layer.msg('健康报告保存失败: ' + error, {icon: 2});
+								});
+							} catch (e) {
+								// 如果无法解析为JSON，尝试直接保存内容
+								console.error('无法解析AI回复为JSON:', e);
+								layer.close(dialogIndex);
+								loadHealthReports(); // 刷新显示现有报告
+								layer.msg('解析报告数据失败，请重试', {icon: 2});
+							}
+						});
+					}
+				});
+			}
+			
+			// 调用Deepseek API
+			function callDeepseekAPI(systemPrompt, userPrompt, callback) {
+				// Deepseek API 密钥
+				const DEEPSEEK_API_KEY = 'sk-53c47b12f6f8488588c341a58c499c76';
+				
+				// 获取响应元素
+				var outputElement = document.getElementById('ai-response');
+				var fullContent = '';
+				
+				// 清除加载动画
+				outputElement.innerHTML = '';
+				
+				// 发起API请求
+				fetch('https://api.deepseek.com/chat/completions', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+					},
+					body: JSON.stringify({
+						model: 'deepseek-chat',
+						max_tokens: 2000,
+						messages: [
+							{ role: 'system', content: systemPrompt },
+							{ role: 'user', content: userPrompt }
+						],
+						stream: true
+					})
+				})
+				.then(response => {
+					if (!response.ok) {
+						throw new Error(`API响应错误: ${response.status}`);
+					}
+					
+					const reader = response.body.getReader();
+					const decoder = new TextDecoder();
+					let buffer = '';
+					
+					function processChunk(chunk) {
+						buffer += chunk;
+						const lines = buffer.split('\n');
+						
+						for (const line of lines) {
+							if (line.startsWith('data:')) {
+								const jsonString = line.replace('data:', '').trim();
+								
+								if (jsonString === '[DONE]') {
+									return;
+								}
+								
+								try {
+									const data = JSON.parse(jsonString);
+									const content = data.choices[0]?.delta?.content || '';
+									if (content) {
+										fullContent += content;
+										outputElement.textContent = fullContent;
+									}
+								} catch (e) {
+									console.error('JSON解析错误:', e);
+								}
+							}
+						}
+						buffer = lines[lines.length - 1];
+					}
+					
+					function pump() {
+						return reader.read().then(({ done, value }) => {
+							if (done) {
+								// 所有数据都已被处理
+								callback(fullContent);
+								return;
+							}
+							
+							// 处理数据块
+							processChunk(decoder.decode(value, { stream: true }));
+							return pump();
+						});
+					}
+					
+					return pump();
+				})
+				.catch(error => {
+					console.error('API调用错误:', error);
+					outputElement.textContent = '生成报告时出错，请重试';
+				});
+			}
+			
+			// 保存健康报告
+			function saveHealthReport(reportData, successCallback, errorCallback) {
+				// 将报告数据转换为JSON字符串
+				var reportContent = JSON.stringify(reportData);
+				
+				// 构建保存数据
+				var saveData = {
+					content: reportContent,
+					yonghuid: userId,
+					type: 3 // 健康报告类型为3
+				};
+				
+				// 发送保存请求
+				$.ajax({
+					url: http.baseurl + "jiankang/save",
+					type: 'POST',
+					contentType: 'application/json',
+					data: JSON.stringify(saveData),
+					beforeSend: function(xhr) {
+						xhr.setRequestHeader('Token', localStorage.getItem('Token'));
+					},
+					success: function(res) {
+						if (res.code == 0) {
+							successCallback && successCallback();
+						} else {
+							errorCallback && errorCallback(res.msg);
+						}
+					},
+					error: function(xhr) {
+						errorCallback && errorCallback(xhr.status);
+					}
+				});
+			}
+			
+			// 加载健康报告数据
+			function loadHealthReports() {
+				var param = {
+					page: 1,
+					limit: 1, // 只加载一条最新的健康报告
+					yonghuid: userId,
+					type: 3 // 健康报告类型为3
+				};
+				
+				// 获取列表数据
+				http.request('jiankang/page', 'get', param, function(res) {
+					if (res.code == 0) {
+						renderHealthReports(res.data.list);
+					} else {
+						layer.msg('获取健康报告失败', {icon: 2});
+					}
+				});
+			}
+			
+			// 渲染健康报告列表
+			function renderHealthReports(reports) {
+				var container = $('#report-container');
+				container.empty(); // 清空容器
+				
+				// 添加报告卡片
+				reports.forEach(function(report) {
+					var dateStr = report.createTime ? new Date(report.createTime).toLocaleString() : '';
+					
+					// 尝试解析JSON格式的报告
+					try {
+						var reportData = JSON.parse(report.content);
+						var card = createStructuredReportCard(reportData, dateStr);
+						container.append(card);
+					} catch (e) {
+						// 如果不是JSON格式，就按普通文本显示
+						var card = $(`
+							<div class="report-card layui-card">
+								<div class="layui-card-header">
+									<span>健康报告</span>
+									<span class="report-date">${dateStr}</span>
+								</div>
+								<div class="layui-card-body">
+									<div class="report-content">${report.content}</div>
+								</div>
+							</div>
+						`);
+						container.append(card);
+					}
+				});
+			}
+			
+			// 创建结构化的报告卡片
+			function createStructuredReportCard(reportData, dateStr) {
+				var metricsHtml = '<div class="health-metrics">';
+				
+				// 添加指标项
+				if (reportData.metrics) {
+					reportData.metrics.forEach(function(metric) {
+						var statusClass = getStatusClass(metric.status);
+						metricsHtml += `
+							<div class="metric-item">
+								<div class="metric-name">${metric.name}</div>
+								<div class="metric-value">${metric.value}</div>
+								<div class="metric-status ${statusClass}">${metric.statusText}</div>
+							</div>
+						`;
+					});
+				}
+				
+				metricsHtml += '</div>';
+				
+				// 创建建议部分
+				var suggestionsHtml = '';
+				if (reportData.suggestions) {
+					suggestionsHtml = `
+						<div class="layui-card" style="margin-top: 20px;">
+							<div class="layui-card-header">健康建议</div>
+							<div class="layui-card-body">
+								<ul style="padding-left: 20px;">
+					`;
+					
+					reportData.suggestions.forEach(function(suggestion) {
+						suggestionsHtml += `<li style="margin-bottom: 10px;">${suggestion}</li>`;
+					});
+					
+					suggestionsHtml += `
+								</ul>
+							</div>
+						</div>
+					`;
+				}
+				
+				// 创建完整卡片
+				var card = $(`
+					<div class="report-card layui-card">
+						<div class="layui-card-header">
+							<span>健康报告</span>
+							<span class="report-date">${dateStr}</span>
+						</div>
+						<div class="layui-card-body">
+							<div class="report-summary">${reportData.summary || ''}</div>
+							${metricsHtml}
+							${suggestionsHtml}
+						</div>
+					</div>
+				`);
+				
+				return card;
+			}
+			
+			// 根据状态返回对应的CSS类
+			function getStatusClass(status) {
+				switch(status) {
+					case 'normal':
+						return 'status-normal';
+					case 'warning':
+						return 'status-warning';
+					case 'danger':
+						return 'status-danger';
+					default:
+						return 'status-normal';
+				}
+			}
+			
+		});
+	</script>
+</body>
+</html> 

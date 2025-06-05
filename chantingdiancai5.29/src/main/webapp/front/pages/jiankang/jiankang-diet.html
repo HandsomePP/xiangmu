@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+	<title>我的饮食计划</title>
+	<link rel="stylesheet" href="../../layui/css/layui.css">
+	<link rel="stylesheet" href="../../xznstatic/css/common.css"/>
+	<style>
+		.container {
+			min-height: 85vh;
+			margin: 20px auto;
+			max-width: 1000px;
+			padding: 20px;
+			display: flex;
+		}
+		
+		.sidebar {
+			width: 200px;
+			background-color: #f5f5f5;
+			padding: 20px;
+			border-radius: 5px;
+			margin-right: 20px;
+		}
+		
+		.sidebar ul {
+			list-style: none;
+			padding: 0;
+			margin: 0;
+		}
+		
+		.sidebar li {
+			margin-bottom: 10px;
+		}
+		
+		.sidebar li a {
+			display: block;
+			padding: 10px 15px;
+			background-color: #e0e0e0;
+			color: #333;
+			border-radius: 4px;
+			text-decoration: none;
+			transition: all 0.3s;
+		}
+		
+		.sidebar li.active a {
+			background-color: #005577;
+			color: white;
+		}
+		
+		.sidebar li a:hover {
+			background-color: #005577;
+			color: white;
+		}
+		
+		.content {
+			flex: 1;
+		}
+		
+		.page-title {
+			text-align: center;
+			padding: 20px 0;
+			font-size: 24px;
+			color: #005577;
+		}
+		
+		.diet-card {
+			margin-bottom: 15px;
+			position: relative;
+		}
+		
+		.diet-card .layui-card-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+		
+		.diet-date {
+			color: #999;
+			font-size: 14px;
+		}
+		
+		.no-diet-plan {
+			text-align: center;
+			padding: 40px 0;
+			color: #999;
+		}
+		
+		.diet-content {
+			white-space: pre-wrap;
+		}
+	</style>
+</head>
+<body>
+	<div class="page-title">我的饮食计划</div>
+	
+	<div class="container">
+		<div class="sidebar">
+			<ul>
+				<li><a href="./jiankang-record.html">我的健康记录</a></li>
+				<li class="active"><a href="./jiankang-diet.html">我的饮食计划</a></li>
+				<li><a href="./jiankang-report.html">我的健康报告</a></li>
+			</ul>
+		</div>
+		
+		<div class="content">
+			<!-- 饮食计划列表 -->
+			<div class="layui-row" id="diet-container">
+				<!-- 计划将通过JS动态添加 -->
+				<div class="no-diet-plan" id="no-diet-plan">暂无饮食计划信息</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- 编辑饮食计划的表单弹窗 -->
+	<div id="diet-form" style="display: none; padding: 20px;">
+		<form class="layui-form">
+			<input type="hidden" name="id" id="diet-id">
+			<div class="layui-form-item layui-form-text">
+				<label class="layui-form-label">饮食计划内容</label>
+				<div class="layui-input-block">
+					<textarea name="content" id="diet-content" placeholder="请输入您的饮食计划内容" class="layui-textarea" style="height: 200px;"></textarea>
+				</div>
+			</div>
+		</form>
+	</div>
+
+	<script src="../../layui/layui.js"></script>
+	<script src="../../js/vue.js"></script>
+	<script src="../../js/config.js"></script>
+	<script src="../../js/utils.js"></script>
+	<script src="../../xznstatic/js/jquery-1.11.3.min.js"></script>
+	<script src="../../modules/config.js"></script>
+	
+	<script>
+		layui.use(['layer', 'element', 'http', 'form', 'jquery'], function() {
+			var layer = layui.layer;
+			var element = layui.element;
+			var http = layui.http;
+			var form = layui.form;
+			var jquery = layui.jquery;
+			
+			var userId = localStorage.getItem('userid') || null;
+			if (!userId) {
+				layer.msg('请先登录', {icon: 2}, function() {
+					location.href = '../login/login.html';
+				});
+				return;
+			}
+			
+			// 加载饮食计划
+			loadDietPlans();
+			
+			// 加载饮食计划数据
+			function loadDietPlans() {
+				var param = {
+					page: 1,
+					limit: 1, // 只加载一条饮食计划记录
+					yonghuid: userId,
+					type: 2 // 饮食计划类型为2
+				};
+				
+				// 获取列表数据
+				http.request('jiankang/page', 'get', param, function(res) {
+					if (res.code == 0) {
+						renderDietPlans(res.data.list);
+					} else {
+						layer.msg('获取饮食计划失败', {icon: 2});
+					}
+				});
+			}
+			
+			// 渲染饮食计划列表
+			function renderDietPlans(plans) {
+				var container = $('#diet-container');
+				container.empty(); // 清空容器
+				
+				
+				// 添加计划卡片
+				plans.forEach(function(plan) {
+					var dateStr = plan.createTime ? new Date(plan.createTime).toLocaleString() : '';
+					var card = $(`
+						<div class="diet-card layui-card">
+							<div class="layui-card-header">
+								<span>饮食计划</span>
+								<span class="diet-date">${dateStr}</span>
+							</div>
+							<div class="layui-card-body">
+								<div class="diet-content">${plan.content}</div>
+							</div>
+							<div class="layui-card-footer" style="text-align: right; padding: 10px;">
+								<button class="layui-btn layui-btn-xs layui-btn-normal edit-btn" data-id="${plan.id}">编辑</button>
+							</div>
+						</div>
+					`);
+					
+					container.append(card);
+				});
+				
+				// 绑定编辑按钮事件
+				$('.edit-btn').click(function() {
+					var planId = $(this).data('id');
+					editDietPlan(planId);
+				});
+			}
+		
+			
+			// 打开编辑饮食计划表单
+			function openDietPlanForm(plan) {
+				// 清空表单
+				$('#diet-id').val('');
+				$('#diet-content').val('');
+				
+				// 填充数据
+				$('#diet-id').val(plan.id);
+				$('#diet-content').val(plan.content);
+				
+				// 打开弹窗
+				layer.open({
+					type: 1,
+					title: '编辑饮食计划',
+					area: ['500px', '400px'],
+					content: $('#diet-form'),
+					btn: ['确认', '取消'],
+					yes: function(index) {
+						saveDietPlan(index);
+					},
+					btn2: function(index) {
+						layer.close(index);
+					}
+				});
+			}
+			
+			// 保存饮食计划
+			function saveDietPlan(index) {
+				var id = $('#diet-id').val();
+				var content = $('#diet-content').val();
+				
+				if (!content) {
+					layer.msg('请输入饮食计划内容', {icon: 2});
+					return;
+				}
+				
+				var planData = {
+					id: id,
+					content: content,
+					yonghuid: userId,
+					type: 2 // 饮食计划类型为2
+				};
+				
+				// 编辑计划
+				http.request('jiankang/update', 'post', planData, function(res) {
+					if (res.code == 0) {
+						layer.msg('更新成功', {icon: 1});
+						layer.close(index);
+						loadDietPlans();
+					} else {
+						layer.msg('更新失败', {icon: 2});
+					}
+				});
+			}
+			
+			// 编辑饮食计划
+			function editDietPlan(planId) {
+				http.request('jiankang/info/' + planId, 'get', {}, function(res) {
+					if (res.code == 0) {
+						openDietPlanForm(res.data);
+					} else {
+						layer.msg('获取计划信息失败', {icon: 2});
+					}
+				});
+			}
+		});
+	</script>
+</body>
+</html> 

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="utf-8">
+    <title>我的餐桌预定</title>
+    <meta name="keywords" content=""/>
+    <meta name="description" content=""/>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel="stylesheet" href="../../layui/css/layui.css">
+    <link rel="stylesheet" href="../../xznstatic/css/common.css"/>
+    <link rel="stylesheet" href="../../xznstatic/css/style.css"/>
+    <script type="text/javascript" src="../../xznstatic/js/jquery-1.11.3.min.js"></script>
+</head>
+<style>
+    html::after {
+        position: fixed;
+        top: 0;
+        right: 0;
+        left: 0;
+        bottom: 0;
+        content: '';
+        display: block;
+        background-attachment: fixed;
+        background-size: cover;
+        background-position: center;
+    }
+
+    .reservation-card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        padding: 20px;
+        transition: all 0.3s ease;
+    }
+
+    .reservation-card:hover {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+
+    .reservation-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .table-info {
+        flex: 1;
+    }
+
+    .table-name {
+        font-size: 20px;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 5px;
+    }
+
+    .table-location {
+        color: #666;
+        font-size: 14px;
+    }
+
+    .reservation-time {
+        color: #999;
+        font-size: 14px;
+        text-align: right;
+    }
+
+    .action-buttons {
+        text-align: right;
+        margin-top: 15px;
+    }
+
+    .cancel-btn {
+        background: #ff4d4f;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.3s;
+    }
+
+    .cancel-btn:hover {
+        background: #ff1f23;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #999;
+    }
+
+    .empty-state i {
+        font-size: 64px;
+        margin-bottom: 20px;
+        display: block;
+    }
+
+    .go-reserve-btn {
+        background: #1890ff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        margin-top: 20px;
+        transition: background 0.3s;
+    }
+
+    .go-reserve-btn:hover {
+        background: #096dd9;
+    }
+</style>
+<body>
+    <div id="app">
+        <div class="layui-container" style="margin-top: 20px;">
+            <!-- 页面标题 -->
+            <div class="layui-row">
+                <div class="layui-col-md12">
+                    <h2 style="text-align: center; color: #333; margin-bottom: 30px;">
+                        <i class="layui-icon layui-icon-tabs"></i> 我的餐桌预定
+                    </h2>
+                </div>
+            </div>
+
+            <!-- 预定列表 -->
+            <div v-if="dataList.length > 0">
+                <div v-for="(item, index) in dataList" :key="index" class="reservation-card">
+                    <div class="reservation-header">
+                        <div class="table-info">
+                            <div class="table-name">{{item.tableName || '餐桌' + item.czTypes}}</div>
+                            <div class="table-location">
+                                <i class="layui-icon layui-icon-location"></i> 
+                                {{item.tableLocation || '餐厅大厅'}}
+                            </div>
+                        </div>
+                        <div class="reservation-time">
+                            <div style="color: #333; font-weight: bold;">预定时间</div>
+                            <div>{{formatDate(item.createTime)}}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <button @click="cancelReservation(item.id, index)" class="cancel-btn">
+                            <i class="layui-icon layui-icon-close"></i> 取消预定
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 分页 -->
+                <div id="page" style="text-align: center; margin-top: 30px;"></div>
+            </div>
+
+            <!-- 空状态 -->
+            <div v-else class="empty-state">
+                <i class="layui-icon layui-icon-face-cry" style="color: #ccc;"></i>
+                <div style="font-size: 18px; margin-bottom: 10px;">暂无餐桌预定记录</div>
+                <div style="color: #999;">您还没有预定任何餐桌，快去预定一个吧！</div>
+                <button @click="goToReserve" class="go-reserve-btn">
+                    <i class="layui-icon layui-icon-add-circle"></i> 去预定餐桌
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- layui -->
+    <script src="../../layui/layui.js"></script>
+    <!-- vue -->
+    <script src="../../js/vue.js"></script>
+    <!-- 组件配置信息 -->
+    <script src="../../js/config.js"></script>
+    <!-- 扩展插件配置信息 -->
+    <script src="../../modules/config.js"></script>
+    <!-- 工具方法 -->
+    <script src="../../js/utils.js"></script>
+
+    <script>
+        var vue = new Vue({
+            el: '#app',
+            data: {
+                // 数据列表
+                dataList: [],
+                // 分页信息
+                page: 1,
+                limit: 10,
+                total: 0
+            },
+            mounted() {
+                // 检查登录状态
+                if (!localStorage.getItem('userid')) {
+                    layui.use(['layer'], function() {
+                        var layer = layui.layer;
+                        layer.msg('请先登录', {icon: 2}, function() {
+                            location.href = '../login/login.html';
+                        });
+                    });
+                    return;
+                }
+                this.getDataList();
+            },
+            methods: {
+                // 获取数据列表
+                getDataList() {
+                    layui.use(['http'], function() {
+                        var http = layui.http;
+                        var param = {
+                            page: vue.page,
+                            limit: vue.limit
+                        };
+
+                        http.request('yudingcanzhuo/page', 'get', param, function(res) {
+                            if (res.code == 0) {
+                                vue.dataList = res.data.list;
+                                vue.total = res.data.total;
+                                
+                                // 获取餐桌详细信息
+                                vue.loadTableDetails();
+                                
+                                if (vue.total > 0) {
+                                    vue.renderPage();
+                                }
+                            }
+                        });
+                    });
+                },
+
+                // 加载餐桌详细信息
+                loadTableDetails() {
+                    layui.use(['http'], function() {
+                        var http = layui.http;
+                        // 先获取所有餐桌信息
+                        http.request('canzhuo/page', 'get', {
+                            page: 1,
+                            limit: 1000  // 获取所有餐桌
+                        }, function(res) {
+                            if (res.code == 0) {
+                                var tableMap = {};
+                                res.data.list.forEach(table => {
+                                    tableMap[table.id] = {
+                                        name: table.name,
+                                        location: table.tableLocation
+                                    };
+                                });
+                                
+                                // 更新数据列表
+                                vue.dataList.forEach((item, index) => {
+                                    if (item.czTypes && tableMap[item.czTypes]) {
+                                        Vue.set(vue.dataList[index], 'tableName', tableMap[item.czTypes].name);
+                                        Vue.set(vue.dataList[index], 'tableLocation', tableMap[item.czTypes].location);
+                                    }
+                                });
+                            }
+                        });
+                    });
+                },
+
+                // 取消预定
+                cancelReservation(reservationId, index) {
+                    layui.use(['http', 'layer'], function() {
+                        var http = layui.http;
+                        var layer = layui.layer;
+                        
+                        layer.confirm('确定要取消这个餐桌预定吗？', {
+                            btn: ['确定', '取消']
+                        }, function(confirmIndex) {
+                            http.request('yudingcanzhuo/delete', 'get', {
+                                ids: reservationId
+                            }, function(res) {
+                                if (res.code == 0) {
+                                    layer.msg('取消预定成功！', {icon: 1});
+                                    // 从列表中移除该项
+                                    vue.dataList.splice(index, 1);
+                                    vue.total--;
+                                    layer.close(confirmIndex);
+                                }
+                            });
+                        });
+                    });
+                },
+
+                // 格式化日期
+                formatDate(dateStr) {
+                    if (!dateStr) return '';
+                    var date = new Date(dateStr);
+                    var year = date.getFullYear();
+                    var month = (date.getMonth() + 1).toString().padStart(2, '0');
+                    var day = date.getDate().toString().padStart(2, '0');
+                    var hours = date.getHours().toString().padStart(2, '0');
+                    var minutes = date.getMinutes().toString().padStart(2, '0');
+                    return `${year}-${month}-${day} ${hours}:${minutes}`;
+                },
+
+                // 跳转到预定页面
+                goToReserve() {
+                    location.href = '../canzhuo/list.html';
+                },
+
+                // 渲染分页
+                renderPage() {
+                    layui.use('laypage', () => {
+                        var laypage = layui.laypage;
+                        laypage.render({
+                            elem: 'page',
+                            count: this.total,
+                            limit: this.limit,
+                            curr: this.page,
+                            layout: ['count', 'prev', 'page', 'next', 'skip'],
+                            jump: (obj, first) => {
+                                if (!first) {
+                                    this.page = obj.curr;
+                                    this.getDataList();
+                                }
+                            }
+                        });
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+</html> 

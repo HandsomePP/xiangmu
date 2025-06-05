@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="utf-8">
+    <title>预定状态查询</title>
+    <meta name="keywords" content=""/>
+    <meta name="description" content=""/>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel="stylesheet" href="../../layui/css/layui.css">
+    <link rel="stylesheet" href="../../xznstatic/css/common.css"/>
+    <link rel="stylesheet" href="../../xznstatic/css/style.css"/>
+</head>
+<style>
+    .status-card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        padding: 30px;
+        text-align: center;
+        margin: 50px auto;
+        max-width: 500px;
+    }
+
+    .status-icon {
+        font-size: 64px;
+        margin-bottom: 20px;
+        display: block;
+    }
+
+    .status-title {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 15px;
+    }
+
+    .status-desc {
+        color: #666;
+        margin-bottom: 30px;
+        line-height: 1.6;
+    }
+
+    .action-btn {
+        background: #1890ff;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        margin: 0 10px;
+        transition: background 0.3s;
+    }
+
+    .action-btn:hover {
+        background: #096dd9;
+    }
+
+    .action-btn.danger {
+        background: #ff4d4f;
+    }
+
+    .action-btn.danger:hover {
+        background: #ff1f23;
+    }
+
+    .table-info {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 5px;
+        margin: 20px 0;
+        text-align: left;
+    }
+
+    .table-info h4 {
+        margin: 0 0 10px 0;
+        color: #333;
+    }
+
+    .table-info p {
+        margin: 5px 0;
+        color: #666;
+    }
+</style>
+<body>
+    <div id="app">
+        <div class="layui-container">
+            <div class="status-card">
+                <!-- 未预定状态 -->
+                <div v-if="!hasReservation">
+                    <i class="layui-icon layui-icon-face-smile status-icon" style="color: #52c41a;"></i>
+                    <div class="status-title" style="color: #52c41a;">暂无餐桌预定</div>
+                    <div class="status-desc">
+                        您目前还没有预定任何餐桌<br>
+                        快去预定一个心仪的餐桌吧！
+                    </div>
+                    <button @click="goToReserve" class="action-btn">
+                        <i class="layui-icon layui-icon-add-circle"></i> 去预定餐桌
+                    </button>
+                </div>
+
+                <!-- 已预定状态 -->
+                <div v-else>
+                    <i class="layui-icon layui-icon-ok-circle status-icon" style="color: #1890ff;"></i>
+                    <div class="status-title" style="color: #1890ff;">您已预定餐桌</div>
+                    <div class="status-desc">
+                        您当前有一个餐桌预定，详情如下：
+                    </div>
+                    
+                    <div class="table-info">
+                        <h4>{{reservationInfo.tableName || '餐桌' + reservationInfo.czTypes}}</h4>
+                        <p><strong>位置：</strong>{{reservationInfo.tableLocation || '餐厅大厅'}}</p>
+                        <p><strong>预定时间：</strong>{{formatDate(reservationInfo.createTime)}}</p>
+                    </div>
+
+                    <button @click="goToMenu" class="action-btn">
+                        <i class="layui-icon layui-icon-tabs"></i> 开始点餐
+                    </button>
+                    <button @click="cancelReservation" class="action-btn danger">
+                        <i class="layui-icon layui-icon-close"></i> 取消预定
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- layui -->
+    <script src="../../layui/layui.js"></script>
+    <!-- vue -->
+    <script src="../../js/vue.js"></script>
+    <!-- 组件配置信息 -->
+    <script src="../../js/config.js"></script>
+    <!-- 扩展插件配置信息 -->
+    <script src="../../modules/config.js"></script>
+    <!-- 工具方法 -->
+    <script src="../../js/utils.js"></script>
+
+    <script>
+        var vue = new Vue({
+            el: '#app',
+            data: {
+                hasReservation: false,
+                reservationInfo: {}
+            },
+            mounted() {
+                // 检查登录状态
+                if (!localStorage.getItem('userid')) {
+                    layui.use(['layer'], function() {
+                        var layer = layui.layer;
+                        layer.msg('请先登录', {icon: 2}, function() {
+                            location.href = '../login/login.html';
+                        });
+                    });
+                    return;
+                }
+                this.checkReservationStatus();
+            },
+            methods: {
+                // 检查预定状态
+                checkReservationStatus() {
+                    layui.use(['http'], function() {
+                        var http = layui.http;
+                        http.request('yudingcanzhuo/page', 'get', {
+                            page: 1,
+                            limit: 1
+                        }, function(res) {
+                            if (res.code == 0 && res.data.list.length > 0) {
+                                vue.hasReservation = true;
+                                vue.reservationInfo = res.data.list[0];
+                                vue.loadTableDetails();
+                            } else {
+                                vue.hasReservation = false;
+                            }
+                        });
+                    });
+                },
+
+                // 加载餐桌详细信息
+                loadTableDetails() {
+                    if (this.reservationInfo.czTypes) {
+                        layui.use(['http'], function() {
+                            var http = layui.http;
+                            http.request(`canzhuo/info/${vue.reservationInfo.czTypes}`, 'get', {}, function(res) {
+                                if (res.code == 0) {
+                                    vue.reservationInfo.tableName = res.data.name;
+                                    vue.reservationInfo.tableLocation = res.data.tableLocation;
+                                }
+                            });
+                        });
+                    }
+                },
+
+                // 跳转到预定页面
+                goToReserve() {
+                    location.href = '../canzhuo/list.html';
+                },
+
+                // 跳转到菜单页面
+                goToMenu() {
+                    location.href = '../shangpinxinxi/list.html';
+                },
+
+                // 取消预定
+                cancelReservation() {
+                    layui.use(['http', 'layer'], function() {
+                        var http = layui.http;
+                        var layer = layui.layer;
+                        
+                        layer.confirm('确定要取消餐桌预定吗？', {
+                            btn: ['确定', '取消']
+                        }, function(confirmIndex) {
+                            http.request('yudingcanzhuo/delete', 'get', {
+                                ids: vue.reservationInfo.id
+                            }, function(res) {
+                                if (res.code == 0) {
+                                    layer.msg('取消预定成功！', {icon: 1});
+                                    vue.hasReservation = false;
+                                    vue.reservationInfo = {};
+                                    layer.close(confirmIndex);
+                                }
+                            });
+                        });
+                    });
+                },
+
+                // 格式化日期
+                formatDate(dateStr) {
+                    if (!dateStr) return '';
+                    var date = new Date(dateStr);
+                    var year = date.getFullYear();
+                    var month = (date.getMonth() + 1).toString().padStart(2, '0');
+                    var day = date.getDate().toString().padStart(2, '0');
+                    var hours = date.getHours().toString().padStart(2, '0');
+                    var minutes = date.getMinutes().toString().padStart(2, '0');
+                    return `${year}-${month}-${day} ${hours}:${minutes}`;
+                }
+            }
+        });
+    </script>
+</body>
+</html> 
